@@ -2,13 +2,17 @@ package de.tnttastisch.yuija;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.*;
+import java.lang.reflect.Type;
+import java.util.HashMap;
 
 public class YuijaSystem {
 
-    private File configFile;
-    private ConfigurationData configurationData;
+    private final Gson gson = new GsonBuilder().serializeNulls().setPrettyPrinting().create();
+    private final HashMap<String, String> configurationData = new HashMap<>();
+    private File config;
     private ApiHandler apiHandler;
 
     public YuijaSystem(String path, String name) throws IOException {
@@ -24,21 +28,21 @@ public class YuijaSystem {
     }
 
     private void initializeConstructor(String path, String name) throws IOException {
-        File config = new File(path, name);
+        this.config = new File(path, name);
         if (!config.exists()) {
             config.getParentFile().mkdirs();
             config.createNewFile();
-        }
 
-        this.configFile = config;
+            configurationData.put("API_KEY", "SECRETAPIKEY");
+            configurationData.put("API_URI", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+            save();
+        }
         load();
-        save();
-        this.apiHandler = new ApiHandler(configurationData.API_URL, configurationData.AUTH_TOKEN);
+        this.apiHandler = new ApiHandler(configurationData.get("API_URI"), configurationData.get("API_KEY"));
     }
 
-    private void save() {
-        try (FileWriter writer = new FileWriter(configFile)) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    public void save() {
+        try (FileWriter writer = new FileWriter(config)) {
             gson.toJson(configurationData, writer);
         } catch (IOException e) {
             e.printStackTrace();
@@ -46,11 +50,13 @@ public class YuijaSystem {
     }
 
     private void load() {
-        try (FileReader reader = new FileReader(configFile)) {
-            Gson gson = new Gson();
-            configurationData = gson.fromJson(reader, ConfigurationData.class);
-        } catch (FileNotFoundException e) {
-            configurationData = new ConfigurationData();
+        try (FileReader reader = new FileReader(config)) {
+            Type type = new TypeToken<HashMap<String, String>>() {}.getType();
+            configurationData.clear();
+            HashMap<String, String> loadedData = gson.fromJson(reader, type);
+            if (loadedData != null) {
+                configurationData.putAll(loadedData);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -58,11 +64,5 @@ public class YuijaSystem {
 
     public ApiHandler getApiHandler() {
         return apiHandler;
-    }
-
-    public static class ConfigurationData {
-        public String API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
-        public String AUTH_TOKEN = "AUTHENICATION_TOKEN";
-
     }
 }
